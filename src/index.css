@@ -1,0 +1,293 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Plus Jakarta Sans", sans-serif;
+    --font-mono: "SF Mono", "JetBrains Mono", Menlo, monospace;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    color: #09090b;
+    background-color: #eef1f5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+    min-height: 100dvh;
+    position: relative;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  /* Prevent automatic zoom-in on mobile text inputs when focused */
+  @media screen and (max-width: 768px) {
+    input, textarea, select {
+      font-size: 16px !important;
+    }
+  }
+}
+
+/* iOS Safe Area Utilities */
+.safe-bottom {
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
+}
+
+.safe-top {
+  padding-top: max(12px, env(safe-area-inset-top, 12px));
+}
+
+/* Mobile Touch Active States */
+.active-press {
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease;
+}
+.active-press:active {
+  transform: scale(0.97);
+  opacity: 0.92;
+}
+
+/* Mobile Bottom Sheet Glass Panel */
+.liquid-glass-bottom-sheet {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.96) 0%,
+    rgba(248, 250, 252, 0.94) 100%
+  );
+  backdrop-filter: blur(40px) saturate(210%);
+  -webkit-backdrop-filter: blur(40px) saturate(210%);
+  border-top: 1px solid rgba(255, 255, 255, 1);
+  box-shadow:
+    0 -16px 40px -10px rgba(0, 0, 0, 0.16),
+    0 -4px 12px -2px rgba(0, 0, 0, 0.08),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 1);
+}
+
+/* Hide scrollbar for clean horizontal swipe on mobile */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ========================================================
+   Physical Apple Liquid Glass (Refined Caustics & Specular)
+   True Optical Refraction, Beveled Edges, Tactile Depth
+   ======================================================== */
+
+/* Primary Liquid Glass Panel (Cards & Main Containers) */
+.liquid-glass-card {
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.72) 0%,
+    rgba(255, 255, 255, 0.45) 50%,
+    rgba(255, 255, 255, 0.62) 100%
+  );
+  backdrop-filter: blur(28px) saturate(190%) contrast(105%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%) contrast(105%);
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  box-shadow:
+    0 20px 45px -12px rgba(0, 0, 0, 0.08),
+    0 8px 20px -6px rgba(0, 0, 0, 0.04),
+    0 1px 3px 0 rgba(0, 0, 0, 0.03),
+    inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.04);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.liquid-glass-card:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.82) 0%,
+    rgba(255, 255, 255, 0.52) 50%,
+    rgba(255, 255, 255, 0.70) 100%
+  );
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 26px 50px -12px rgba(0, 0, 0, 0.10),
+    0 10px 24px -6px rgba(0, 0, 0, 0.05),
+    0 1px 3px 0 rgba(0, 0, 0, 0.03),
+    inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 1),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.04);
+}
+
+/* Glass Header & Sticky Navigation */
+.liquid-glass-nav {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.78) 0%,
+    rgba(255, 255, 255, 0.55) 100%
+  );
+  backdrop-filter: blur(36px) saturate(200%);
+  -webkit-backdrop-filter: blur(36px) saturate(200%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow:
+    0 8px 28px -4px rgba(0, 0, 0, 0.04),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.02),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* Secondary Inner Translucent Pod (Subtle Glass) */
+.liquid-glass-subtle {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.35) 100%
+  );
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow:
+    0 4px 16px -2px rgba(0, 0, 0, 0.03),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* Apple Liquid Pill Buttons */
+.liquid-glass-pill {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.80) 0%,
+    rgba(255, 255, 255, 0.50) 100%
+  );
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  box-shadow:
+    0 2px 8px -1px rgba(0, 0, 0, 0.05),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.03);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.liquid-glass-pill:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.75) 100%
+  );
+  border-color: rgba(255, 255, 255, 1);
+  box-shadow:
+    0 4px 14px -2px rgba(0, 0, 0, 0.08),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 1);
+  transform: translateY(-0.5px);
+}
+
+/* Apple Segmented Control Rail */
+.liquid-glass-rail {
+  background: rgba(220, 224, 230, 0.55);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow:
+    inset 0 1.5px 3px 0 rgba(0, 0, 0, 0.06),
+    0 1px 2px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* Apple Deep Obsidian Glass (High-Contrast Dark Panels) */
+.liquid-glass-dark {
+  background: linear-gradient(
+    135deg,
+    rgba(18, 18, 20, 0.88) 0%,
+    rgba(10, 10, 12, 0.94) 100%
+  );
+  backdrop-filter: blur(36px) saturate(180%);
+  -webkit-backdrop-filter: blur(36px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 24px 50px -12px rgba(0, 0, 0, 0.5),
+    0 8px 20px -4px rgba(0, 0, 0, 0.3),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.25),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* Apple Solid Black Hero Action Button */
+.apple-button-black {
+  background: #09090b;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 8px 20px -4px rgba(0, 0, 0, 0.28),
+    0 2px 6px -1px rgba(0, 0, 0, 0.16),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.25);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.apple-button-black:hover:not(:disabled) {
+  background: #18181b;
+  box-shadow:
+    0 12px 28px -4px rgba(0, 0, 0, 0.38),
+    0 4px 10px -2px rgba(0, 0, 0, 0.22),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.35);
+  transform: translateY(-1px);
+}
+
+.apple-button-black:active:not(:disabled) {
+  transform: translateY(0.5px) scale(0.99);
+}
+
+/* Liquid Glass Drawer & Modal Panels */
+.liquid-glass-drawer {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.88) 0%,
+    rgba(255, 255, 255, 0.78) 100%
+  );
+  backdrop-filter: blur(40px) saturate(210%);
+  -webkit-backdrop-filter: blur(40px) saturate(210%);
+  border-left: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow:
+    -20px 0 50px -10px rgba(0, 0, 0, 0.15),
+    inset 1px 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.liquid-glass-modal {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.92) 0%,
+    rgba(255, 255, 255, 0.82) 100%
+  );
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 30px 60px -15px rgba(0, 0, 0, 0.18),
+    0 12px 24px -6px rgba(0, 0, 0, 0.08),
+    inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 1),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.04);
+}
+
+/* Apple macOS Native Liquid Glass Popover Menu */
+.liquid-glass-popover {
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.90) 0%,
+    rgba(255, 255, 255, 0.78) 100%
+  );
+  backdrop-filter: blur(36px) saturate(210%);
+  -webkit-backdrop-filter: blur(36px) saturate(210%);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 20px 40px -8px rgba(0, 0, 0, 0.16),
+    0 8px 16px -4px rgba(0, 0, 0, 0.08),
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 1),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.03);
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(113, 113, 122, 0.35);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(82, 82, 91, 0.55);
+}
