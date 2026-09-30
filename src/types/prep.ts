@@ -1,8 +1,21 @@
 export type StepType = 'point' | 'reason' | 'example' | 'point2';
 
+export type TopicCategory =
+  | 'all'
+  | 'health'
+  | 'workplace'
+  | 'tech'
+  | 'social'
+  | 'lifestyle'
+  | 'culture'
+  | 'food'
+  | 'travel'
+  | 'daily'
+  | string;
+
 export interface Topic {
   id: string;
-  category: 'daily' | 'food' | 'travel' | 'social' | 'entertainment' | 'workplace' | 'lifestyle';
+  category: TopicCategory;
   categoryLabel: string;
   difficulty: 'beginner' | 'intermediate' | 'advanced';
   questionEn: string;

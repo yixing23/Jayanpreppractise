@@ -230,7 +230,7 @@ Point (Closing / takeaway): ${point2 || '(Empty)'}`
 }
 
 Perform an exhaustive, constructive, and highly educational evaluation.
-NOTE: If this is an everyday life, hobby, lifestyle, or casual conversation topic, praise natural, vivid, relatable storytelling and conversational fluency. Do NOT force stiff corporate jargon onto casual topics.
+NOTE: Adapt your evaluation to the topic's domain. If it is a workplace, career, or technology topic, emphasize structured causality, precise vocabulary, and executive clarity. If it is about health, wellness, personal philosophy, or daily lifestyle, emphasize natural conversational rhythm, vivid relatable experiences, and authentic native phrasing.
 
 Focus on:
 1. PREP Structure Fidelity: Point, Reason, Example, Point 2
@@ -390,23 +390,50 @@ Return strict JSON format:
 app.post(['/api/prep/generate-topic', '/prep/generate-topic'], async (req, res) => {
   try {
     const { category, difficulty } = req.body;
-    const prompt = `Generate 4 highly relatable, casual, everyday life discussion prompts/questions for practicing the PREP framework in English.
-Category: ${category || 'daily'}
-Difficulty level: ${difficulty || 'beginner'}
+    const cat = category || 'health';
+    const diff = difficulty || 'intermediate';
 
-Return strict JSON:
+    const categoryGuidelines: Record<string, string> = {
+      health:
+        'Focus on Health & Wellness: sleep optimization, mental well-being & burnout recovery, sustainable exercise habits, digital detox & screen fatigue, nutrition, and work-life vitality.',
+      workplace:
+        'Focus on Career & Professional Growth: remote/hybrid work dynamics, setting boundaries & saying no politely, deep work vs meeting overload, passion vs compensation, and effective cross-team communication.',
+      tech:
+        'Focus on Technology & AI: generative AI & human creativity, short-form video & attention span, smart wearables & health data anxiety, algorithm bubbles, and digital transformation.',
+      culture:
+        'Focus on Personal Philosophy & Society: megacity hustle vs small-town peace, minimalism vs consumerism, lifelong learning, comfort zone breakthroughs, and modern life values.',
+      social:
+        'Focus on Human Connection: in-depth face-to-face talks vs instant messaging, living alone vs roommates, maintaining authentic friendships, and healthy interpersonal boundaries.',
+      lifestyle:
+        'Focus on Daily Habits & Routine: morning vs night energy patterns, home cooking vs takeout, solo travel vs group travel, and mindful rituals.',
+    };
+
+    const topicGuideline = categoryGuidelines[cat] || categoryGuidelines.health;
+
+    const prompt = `Generate 4 thought-provoking, practical, and highly engaging discussion topics for practicing the PREP framework (Point, Reason, Example, Point) in English.
+
+Target Domain: ${cat.toUpperCase()}
+Topic Directive: ${topicGuideline}
+Difficulty Level: ${diff}
+
+Guidelines:
+- Each question must spark a clear stance or preference with rich reasons and real-life examples.
+- Include a natural English question, clear Chinese translation, and concise PREP structure guidance.
+- Questions must be modern, relevant, and directly applicable to daily life or professional communication.
+
+Return strict JSON format:
 {
   "topics": [
     {
-      "id": "string",
-      "questionEn": "string",
-      "questionZh": "string",
-      "category": "string",
+      "id": "ai-${Date.now()}-1",
+      "questionEn": "Natural, articulate English question",
+      "questionZh": "流畅贴切的中文翻译",
+      "category": "${cat}",
       "prepHint": {
-        "pointHint": "string",
-        "reasonHint": "string",
-        "exampleHint": "string",
-        "point2Hint": "string"
+        "pointHint": "清晰亮明核心观点与立场的建议（中文）",
+        "reasonHint": "剖析深层机制或核心原因的思路（中文）",
+        "exampleHint": "生动具体、具有说服力案例的启发（中文）",
+        "point2Hint": "结尾重申与价值升华的建议（中文）"
       }
     }
   ]
@@ -414,9 +441,9 @@ Return strict JSON:
 
     const parsed = await callLLMJson({
       systemInstruction:
-        'You are an engaging English conversation coach. Return valid JSON containing realistic everyday life practice topics.',
+        'You are an elite bilingual English communications coach. Return strictly valid JSON containing inspiring, multi-faceted practice topics across health, career, technology, and modern life.',
       prompt,
-      maxTokens: 1500,
+      maxTokens: 1600,
       temperature: 0.8,
     });
 

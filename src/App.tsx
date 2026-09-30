@@ -465,15 +465,21 @@ export default function App() {
       if (data.topics && data.topics.length > 0) {
         const formatted: Topic[] = data.topics.map((t: any, idx: number) => ({
           id: `ai-${Date.now()}-${idx}`,
-          category: t.category || category || 'workplace',
+          category: t.category || category || 'health',
           categoryLabel:
-            category === 'interview'
-              ? '英文面试常见题'
+            category === 'health'
+              ? '🌿 身心与健康'
+              : category === 'workplace'
+              ? '💼 职场与事业'
               : category === 'tech'
-              ? 'AI与科技趋势'
-              : category === 'debate'
-              ? '思辨与价值权衡'
-              : '职场与业务汇报',
+              ? '🤖 科技与 AI'
+              : category === 'culture'
+              ? '💡 认知与成长'
+              : category === 'social'
+              ? '💬 人际与社交'
+              : category === 'lifestyle'
+              ? '☕ 日常与生活'
+              : t.categoryLabel || 'AI 实时推荐题',
           difficulty: 'intermediate',
           questionEn: t.questionEn,
           questionZh: t.questionZh || '',

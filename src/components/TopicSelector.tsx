@@ -28,13 +28,13 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({
   const [customZh, setCustomZh] = useState<string>('');
 
   const categories = [
-    { id: 'all', label: '☕ 全部日常生活题' },
-    { id: 'food', label: '🍳 做饭与外卖' },
-    { id: 'travel', label: '✈️ 旅行与假期' },
-    { id: 'lifestyle', label: '🏃 作息与习惯' },
-    { id: 'social', label: '📱 社交与手机' },
-    { id: 'entertainment', label: '🍿 影音与娱乐' },
-    { id: 'daily', label: '🐱 宠物与阅读' },
+    { id: 'all', label: '🌐 全部主题' },
+    { id: 'health', label: '🌿 身心与健康' },
+    { id: 'workplace', label: '💼 职场与事业' },
+    { id: 'tech', label: '🤖 科技与 AI' },
+    { id: 'culture', label: '💡 认知与成长' },
+    { id: 'social', label: '💬 人际与社交' },
+    { id: 'lifestyle', label: '☕ 日常与生活' },
   ];
 
   const filteredTopics = selectedCategory === 'all'
