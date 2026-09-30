@@ -33,7 +33,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-black text-white flex items-center justify-center font-bold text-xs sm:text-base tracking-wider shadow-md shadow-black/20 ring-1 ring-white/30 transition-transform active-press shrink-0">
             <span className="text-amber-400">P</span>REP
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 hidden sm:block">
             <div className="flex items-center gap-1.5">
               <h1 className="text-sm sm:text-base md:text-lg font-bold text-zinc-950 tracking-tight font-sans whitespace-nowrap">
                 PREP Master
@@ -87,13 +87,13 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={onOpenVocab}
-              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-semibold text-zinc-900 liquid-glass-pill rounded-full whitespace-nowrap shrink-0 active-press"
+              className="relative flex items-center justify-center w-8 h-8 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 text-xs font-semibold text-zinc-900 liquid-glass-pill rounded-full whitespace-nowrap shrink-0 active-press"
               title="查看生词本与复习卡片"
             >
               <BookOpen className="w-3.5 h-3.5 text-zinc-800 shrink-0" />
-              <span className="hidden sm:inline">生词本</span>
+              <span className="hidden sm:inline sm:ml-1">生词本</span>
               {vocabCount > 0 && (
-                <span className="min-w-4 h-4 px-1 bg-black text-white text-[10px] font-bold rounded-full flex items-center justify-center shrink-0">
+                <span className="absolute -top-1 -right-1 sm:static sm:top-auto sm:right-auto sm:ml-1 min-w-3.5 sm:min-w-4 h-3.5 sm:h-4 px-1 bg-black text-white text-[9px] sm:text-[10px] font-bold rounded-full flex items-center justify-center shrink-0 shadow-xs ring-1 ring-white">
                   {vocabCount > 99 ? '99+' : vocabCount}
                 </span>
               )}
@@ -103,7 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={onOpenGuide}
-              className="flex items-center justify-center w-7 h-7 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 text-xs font-medium text-zinc-700 hover:text-black liquid-glass-pill rounded-full shrink-0 active-press"
+              className="flex items-center justify-center w-8 h-8 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 text-xs font-medium text-zinc-700 hover:text-black liquid-glass-pill rounded-full shrink-0 active-press"
               title="PREP 结构秘籍"
             >
               <Sparkles className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
@@ -114,13 +114,13 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={onOpenHistory}
-              className="flex items-center justify-center w-7 h-7 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 text-xs font-medium text-zinc-700 hover:text-black liquid-glass-pill rounded-full shrink-0 relative active-press"
+              className="relative flex items-center justify-center w-8 h-8 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 text-xs font-medium text-zinc-700 hover:text-black liquid-glass-pill rounded-full shrink-0 active-press"
               title="查看练习历史"
             >
               <History className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
               <span className="hidden md:inline ml-1">历史</span>
               {historyCount > 0 && (
-                <span className="absolute -top-1 -right-1 sm:static sm:top-auto sm:right-auto sm:ml-1 min-w-3.5 sm:min-w-4 h-3.5 sm:h-4 px-1 bg-zinc-800 text-white text-[9px] sm:text-[10px] font-bold rounded-full flex items-center justify-center shrink-0">
+                <span className="absolute -top-1 -right-1 sm:static sm:top-auto sm:right-auto sm:ml-1 min-w-3.5 sm:min-w-4 h-3.5 sm:h-4 px-1 bg-zinc-800 text-white text-[9px] sm:text-[10px] font-bold rounded-full flex items-center justify-center shrink-0 shadow-xs ring-1 ring-white">
                   {historyCount > 9 ? '9+' : historyCount}
                 </span>
               )}
@@ -130,7 +130,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={onOpenSync}
-              className={`flex items-center justify-center w-7 h-7 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 text-xs font-medium liquid-glass-pill rounded-full shrink-0 relative active-press ${
+              className={`relative flex items-center justify-center w-8 h-8 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 text-xs font-medium liquid-glass-pill rounded-full shrink-0 active-press ${
                 syncCode ? 'text-emerald-700 bg-emerald-50/70 border border-emerald-400/40' : 'text-zinc-700 hover:text-black'
               }`}
               title={syncCode ? `多端同步已连接 (${syncCode})` : '设置跨设备云同步'}
@@ -138,7 +138,7 @@ export const Header: React.FC<HeaderProps> = ({
               <Cloud className={`w-3.5 h-3.5 shrink-0 ${syncCode ? 'text-emerald-600' : 'text-zinc-600'} ${isSyncing ? 'animate-pulse' : ''}`} />
               <span className="hidden md:inline ml-1">{syncCode ? '已同步' : '同步'}</span>
               {syncCode && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ml-1 hidden sm:inline-block" />
+                <span className="absolute -top-0.5 -right-0.5 sm:static sm:top-auto sm:right-auto w-2 h-2 sm:w-1.5 sm:h-1.5 rounded-full bg-emerald-500 ring-1 ring-white sm:ring-0 animate-pulse sm:ml-1" />
               )}
             </button>
           </div>
