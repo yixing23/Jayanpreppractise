@@ -509,6 +509,7 @@ export default function App() {
 
   // Submit Evaluation
   const handleSubmitEvaluation = async () => {
+    if (isEvaluating) return;
     setIsEvaluating(true);
     setErrorMsg(null);
 
@@ -690,6 +691,7 @@ export default function App() {
           onGenerateAiTopics={handleGenerateAiTopics}
           isGeneratingTopic={isGeneratingTopic}
           onCustomTopic={handleCustomTopic}
+          onFillSample={handleFillSample}
         />
 
         {/* Practice Mode Description */}

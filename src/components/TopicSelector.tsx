@@ -9,6 +9,7 @@ interface TopicSelectorProps {
   onGenerateAiTopics: (category: string) => Promise<void>;
   isGeneratingTopic: boolean;
   onCustomTopic: (questionEn: string, questionZh: string) => void;
+  onFillSample?: () => void;
 }
 
 export const TopicSelector: React.FC<TopicSelectorProps> = ({
@@ -18,6 +19,7 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({
   onGenerateAiTopics,
   isGeneratingTopic,
   onCustomTopic,
+  onFillSample,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showDrawer, setShowDrawer] = useState<boolean>(false);
@@ -231,14 +233,28 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({
               {showHints ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
 
-            {currentTopic.sampleAnswer && (
-              <button
-                onClick={() => setShowSample(!showSample)}
-                className="text-xs text-zinc-600 hover:text-black underline underline-offset-2 font-medium shrink-0"
-              >
-                {showSample ? '收起示范' : '查看高分示范'}
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {currentTopic.sampleAnswer && (
+                <button
+                  type="button"
+                  onClick={() => setShowSample(!showSample)}
+                  className="text-xs text-zinc-600 hover:text-black underline underline-offset-2 font-medium shrink-0"
+                >
+                  {showSample ? '收起示范' : '查看高分示范'}
+                </button>
+              )}
+              {currentTopic.sampleAnswer && onFillSample && (
+                <button
+                  type="button"
+                  onClick={onFillSample}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300/60 transition-all shrink-0 active-press"
+                  title="一键将示范回答填入输入框，秒测 AI 评估与润色"
+                >
+                  <Sparkles className="w-3 h-3 text-emerald-600 shrink-0" />
+                  <span>一键填入示范</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {showHints && (
@@ -295,6 +311,19 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({
                 <span className="font-mono font-bold text-zinc-400 mr-2">[Point Reiterate]</span>
                 <span className="text-zinc-100">{currentTopic.sampleAnswer.point2}</span>
               </p>
+
+              {onFillSample && (
+                <div className="pt-2 flex justify-end border-t border-zinc-800/80">
+                  <button
+                    type="button"
+                    onClick={onFillSample}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors shadow-xs active-press"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>填入此范文并开始体验</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

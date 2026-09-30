@@ -14,8 +14,10 @@ import {
   ArrowUpRight,
   Award,
   BookmarkPlus,
+  Share2,
 } from 'lucide-react';
 import { playTextToSpeech, stopTextToSpeech } from '../utils/speech';
+import { ShareCardModal } from './ShareCardModal';
 
 interface EvaluationReportProps {
   evaluation: EvaluationResult;
@@ -38,6 +40,7 @@ export const EvaluationReport: React.FC<EvaluationReportProps> = ({
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [showShareModal, setShowShareModal] = useState<boolean>(false);
 
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -125,13 +128,24 @@ export const EvaluationReport: React.FC<EvaluationReportProps> = ({
             </div>
           </div>
 
-          {/* Action button */}
-          <button
-            onClick={onReset}
-            className="self-stretch sm:self-auto px-4 py-2 text-xs font-semibold text-zinc-800 hover:text-black liquid-glass-pill rounded-full text-center shrink-0"
-          >
-            再练一次 / 修改草稿
-          </button>
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 self-stretch sm:self-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowShareModal(true)}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-black hover:bg-zinc-800 rounded-full shadow-xs active-press transition-all whitespace-nowrap"
+            >
+              <Share2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>分享打卡 / 成就</span>
+            </button>
+            <button
+              type="button"
+              onClick={onReset}
+              className="flex-1 sm:flex-none px-4 py-2 text-xs font-semibold text-zinc-800 hover:text-black liquid-glass-pill rounded-full text-center shrink-0 active-press whitespace-nowrap"
+            >
+              再练一次
+            </button>
+          </div>
         </div>
 
         {/* 5-Dimension Metric Bars */}
@@ -680,6 +694,14 @@ export const EvaluationReport: React.FC<EvaluationReportProps> = ({
           ))}
         </div>
       </div>
+
+      {/* Share Card Modal */}
+      <ShareCardModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        evaluation={evaluation}
+        topic={topic}
+      />
     </div>
   );
 };
