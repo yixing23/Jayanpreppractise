@@ -168,30 +168,41 @@ export const VocabDetailModal: React.FC<VocabDetailModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="liquid-glass-modal rounded-3xl max-w-xl w-full max-h-[90vh] sm:max-h-[85vh] overflow-y-auto shadow-2xl border border-white/90 animate-in fade-in zoom-in-95 duration-150 safe-bottom">
-        {/* Header */}
-        <div className="sticky top-0 bg-white/80 backdrop-blur-md px-4 sm:px-6 py-3.5 sm:py-4 border-b border-zinc-200/50 flex items-center justify-between z-10">
-          <div className="flex items-center gap-2 sm:gap-2.5">
-            <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-black text-white flex items-center justify-center font-bold text-xs shadow-xs ring-1 ring-white/20 shrink-0">
-              <BookOpen className="w-4 h-4" />
-            </span>
-            <span className="text-[11px] sm:text-xs font-bold text-zinc-950 uppercase tracking-wider font-mono">
-              PREP 语境词典与生词本
-            </span>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-md animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg liquid-glass text-zinc-900 rounded-[28px] sm:rounded-3xl border border-white/80 shadow-2xl overflow-hidden flex flex-col max-h-[88vh] animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header - Apple Style */}
+        <div className="p-4 sm:p-5 border-b border-zinc-200/60 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-2xl bg-black text-white flex items-center justify-center shadow-xs shrink-0">
+              <BookOpen className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-zinc-950 flex items-center gap-1.5">
+                语境词典与生词研习
+              </h3>
+              <p className="text-xs text-zinc-500 font-mono mt-0.5">
+                IPA 纯正音标 · 地道习语搭配 · PREP 表达提炼
+              </p>
+            </div>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-zinc-400 hover:text-black rounded-full hover:bg-white/80 transition-colors active-press"
+            className="p-2 text-zinc-400 hover:text-black rounded-full hover:bg-white/80 transition-colors active-press"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="p-6 space-y-4 text-xs">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-xs overscroll-contain">
           {!data && isLoading ? (
             <div className="py-12 flex flex-col items-center justify-center gap-3 text-zinc-500">
               <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin" />

@@ -789,33 +789,14 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-auto border-t border-white/60 bg-white/40 backdrop-blur-xl py-6 text-xs text-slate-500">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-          <div>
-            <span className="font-semibold text-slate-800">PREP Master</span>
-            <span className="mx-2 text-slate-300">·</span>
-            <span>日常生活结构性英文表达与实时纠错 (Point · Reason · Example · Point)</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setShowVocabDrawer(true)}
-              className="hover:text-indigo-600 font-medium transition-colors"
-            >
-              📖 生词本与卡片 ({vocabWords.length})
-            </button>
-            <button
-              onClick={() => setShowGuideModal(true)}
-              className="hover:text-slate-900 transition-colors"
-            >
-              PREP 表达公式
-            </button>
-            <button
-              onClick={() => setShowHistoryDrawer(true)}
-              className="hover:text-slate-900 transition-colors"
-            >
-              历史练习本
-            </button>
-          </div>
+      <footer className="mt-auto border-t border-white/40 bg-white/30 backdrop-blur-md py-8 text-center safe-bottom select-none">
+        <div className="max-w-xl mx-auto px-4 flex flex-col items-center justify-center gap-1.5">
+          <p className="font-serif italic text-xs sm:text-sm text-zinc-700 tracking-wide">
+            “Your limits of your language is your limits of the world”
+          </p>
+          <p className="font-sans text-[11px] sm:text-xs text-zinc-400 font-medium tracking-widest">
+            语言观既世界观
+          </p>
         </div>
       </footer>
 

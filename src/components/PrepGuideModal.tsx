@@ -11,19 +11,25 @@ export const PrepGuideModal: React.FC<PrepGuideModalProps> = ({ isOpen, onClose 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="liquid-glass-modal rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-white/90 safe-bottom">
-        {/* Header */}
-        <div className="sticky top-0 bg-white/80 backdrop-blur-md px-4 sm:px-6 py-3.5 sm:py-4 border-b border-zinc-200/50 flex items-center justify-between z-10">
-          <div className="flex items-center gap-2 sm:gap-2.5">
-            <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-black text-white font-bold text-xs sm:text-sm flex items-center justify-center shadow-xs ring-1 ring-white/20 font-mono shrink-0">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-md animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl liquid-glass text-zinc-900 rounded-[28px] sm:rounded-3xl border border-white/80 shadow-2xl overflow-hidden flex flex-col max-h-[88vh] animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header - Apple Style */}
+        <div className="p-4 sm:p-5 border-b border-zinc-200/60 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-2xl bg-black text-white flex items-center justify-center shadow-xs shrink-0 font-bold font-mono">
               P
-            </span>
+            </div>
             <div>
               <h2 className="text-sm sm:text-base font-bold text-zinc-950 font-sans">
                 PREP 结构性表达秘籍与避坑指南
               </h2>
-              <p className="text-[10px] sm:text-xs text-zinc-500 font-mono hidden xs:block">
+              <p className="text-xs text-zinc-500 font-mono mt-0.5">
                 Point · Reason · Example · Point：沟通黄金公式
               </p>
             </div>
@@ -32,14 +38,14 @@ export const PrepGuideModal: React.FC<PrepGuideModalProps> = ({ isOpen, onClose 
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 sm:p-2 text-zinc-400 hover:text-black rounded-full hover:bg-white/80 transition-colors active-press"
+            className="p-2 text-zinc-400 hover:text-black rounded-full hover:bg-white/80 transition-colors active-press"
           >
-            <X className="w-4 h-4 sm:w-5 sm:h-5" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 text-sm">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 text-sm overscroll-contain">
           {/* Why PREP */}
           <div className="liquid-glass-subtle p-5 rounded-2xl border border-white/80">
             <h3 className="font-bold text-zinc-950 text-xs uppercase tracking-wider mb-1.5 flex items-center gap-1.5 font-mono">

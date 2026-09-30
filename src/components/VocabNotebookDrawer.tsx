@@ -175,20 +175,29 @@ export const VocabNotebookDrawer: React.FC<VocabNotebookDrawerProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="liquid-glass-drawer w-full sm:max-w-xl h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-200 safe-bottom">
-        {/* Header */}
-        <div className="p-3.5 sm:px-6 sm:py-4 border-b border-zinc-200/50 flex items-center justify-between">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-md animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl liquid-glass text-zinc-900 rounded-[28px] sm:rounded-3xl border border-white/80 shadow-2xl overflow-hidden flex flex-col max-h-[88vh] animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header - Apple Style */}
+        <div className="p-4 sm:p-5 border-b border-zinc-200/60 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
-            <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-black text-white flex items-center justify-center font-bold text-xs shadow-md ring-1 ring-white/20 shrink-0">
-              <BookOpen className="w-4 h-4" />
-            </span>
+            <div className="w-9 h-9 rounded-2xl bg-black text-white flex items-center justify-center shadow-xs shrink-0">
+              <BookOpen className="w-5 h-5 text-white" />
+            </div>
             <div>
-              <h2 className="text-xs sm:text-sm font-bold text-zinc-950 font-sans">
+              <h2 className="text-sm sm:text-base font-bold text-zinc-950 font-sans flex items-center gap-1.5">
                 日常生词本与地道语汇库
+                <span className="text-[11px] bg-zinc-200/80 text-zinc-700 font-semibold px-2 py-0.5 rounded-full font-mono">
+                  {words.length}
+                </span>
               </h2>
-              <p className="text-[10px] sm:text-[11px] text-zinc-500 font-mono">
-                收录 {words.length} 词 · 已掌握 {masteredCount} 词 ({masteryPercentage}%)
+              <p className="text-xs text-zinc-500 font-mono mt-0.5">
+                已收录 {words.length} 词 · 已掌握 {masteredCount} 词 ({masteryPercentage}%)
               </p>
             </div>
           </div>
