@@ -49,7 +49,19 @@ export default function App() {
   const [vocabWords, setVocabWords] = useState<VocabWord[]>(() => {
     try {
       const saved = localStorage.getItem('prep_master_vocab');
-      return saved ? JSON.parse(saved) : INITIAL_VOCAB;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          // Automatically filter out legacy demo words so all devices start clean
+          return parsed.filter(
+            (w: VocabWord) =>
+              w.id !== 'vocab-unwind' &&
+              w.id !== 'vocab-mindful' &&
+              w.id !== 'vocab-tactile'
+          );
+        }
+      }
+      return INITIAL_VOCAB;
     } catch {
       return INITIAL_VOCAB;
     }
