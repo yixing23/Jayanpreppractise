@@ -12,8 +12,10 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json());
 
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || 'sk-c8d05ec58402403d868c50f1a55cca6d';
+
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
+  apiKey: process.env.GEMINI_API_KEY || '',
   httpOptions: {
     headers: {
       'User-Agent': 'aistudio-build',
@@ -43,7 +45,6 @@ async function generateContentWithFallback(
         console.warn(`Model ${model} attempt ${attempt + 1} failed. RateLimit: ${isRateLimit}. Error:`, msg);
 
         if (isRateLimit && attempt === 0) {
-          // Brief backoff before retry
           await new Promise((r) => setTimeout(r, 1200));
         } else {
           break;
@@ -54,6 +55,75 @@ async function generateContentWithFallback(
   }
 
   throw lastError;
+}
+
+// Unified high-reliability LLM caller: Primary DeepSeek-V3, fallback to Gemini
+async function callLLMJson(options: {
+  systemInstruction?: string;
+  prompt: string;
+  geminiSchema?: any;
+  maxTokens?: number;
+  temperature?: number;
+}): Promise<any> {
+  const deepseekKey = (process.env.DEEPSEEK_API_KEY || DEEPSEEK_API_KEY).trim();
+
+  // 1. Primary: DeepSeek-V3 (OpenAI-compatible)
+  if (deepseekKey) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const messages: Array<{ role: 'system' | 'user'; content: string }> = [];
+        if (options.systemInstruction) {
+          messages.push({ role: 'system', content: options.systemInstruction });
+        }
+        messages.push({ role: 'user', content: options.prompt });
+
+        const res = await fetch('https://api.deepseek.com/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${deepseekKey}`,
+          },
+          body: JSON.stringify({
+            model: 'deepseek-chat',
+            messages,
+            response_format: { type: 'json_object' },
+            temperature: options.temperature ?? 0.7,
+            max_tokens: options.maxTokens ?? 2500,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const content = data.choices?.[0]?.message?.content || '{}';
+          return JSON.parse(content);
+        } else {
+          const errText = await res.text();
+          console.warn(`DeepSeek API error status ${res.status}:`, errText);
+        }
+      } catch (e) {
+        console.warn(`DeepSeek attempt ${attempt + 1} error:`, e);
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+  }
+
+  // 2. Secondary fallback: Gemini
+  if (process.env.GEMINI_API_KEY) {
+    const config: any = {
+      systemInstruction: options.systemInstruction,
+      responseMimeType: 'application/json',
+    };
+    if (options.geminiSchema) {
+      config.responseSchema = options.geminiSchema;
+    }
+    const response = await generateContentWithFallback(ai, {
+      contents: options.prompt,
+      config,
+    });
+    return JSON.parse(response.text || '{}');
+  }
+
+  throw new Error('AI service error: Unable to complete LLM request');
 }
 
 // In-memory high-speed cache for vocabulary lookups
@@ -167,146 +237,143 @@ Focus on:
 
 Output STRICTLY valid JSON conforming to the requested schema.`;
 
-    const response = await generateContentWithFallback(ai, {
-      contents: promptText,
-      config: {
-        systemInstruction:
-          'You are an empathetic, expert bilingual (English-Chinese) speaking & writing coach for the PREP method. You help learners express their opinions on daily life and general topics with structure, clarity, and idiomatic ease. Output strictly valid JSON. Keep explanations in Chinese for clarity, while all English text must be natural, authentic native English.',
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            overallScore: { type: Type.INTEGER, description: 'Score from 0 to 100' },
-            scores: {
-              type: Type.OBJECT,
-              properties: {
-                structure: { type: Type.INTEGER, description: 'Score 0-100 for PREP structural adherence' },
-                clarity: { type: Type.INTEGER, description: 'Score 0-100 for clarity and conciseness' },
-                logic: { type: Type.INTEGER, description: 'Score 0-100 for logical depth and cause-effect connection' },
-                grammar: { type: Type.INTEGER, description: 'Score 0-100 for grammatical accuracy' },
-                vocabulary: { type: Type.INTEGER, description: 'Score 0-100 for lexical richness and idiomatic collocations' },
-              },
-              required: ['structure', 'clarity', 'logic', 'grammar', 'vocabulary'],
+    const parsed = await callLLMJson({
+      systemInstruction:
+        'You are an empathetic, expert bilingual (English-Chinese) speaking & writing coach for the PREP method. You help learners express their opinions on daily life and general topics with structure, clarity, and idiomatic ease. Output strictly valid JSON. Keep explanations in Chinese for clarity, while all English text must be natural, authentic native English.',
+      prompt: promptText,
+      maxTokens: 3000,
+      geminiSchema: {
+        type: Type.OBJECT,
+        properties: {
+          overallScore: { type: Type.INTEGER, description: 'Score from 0 to 100' },
+          scores: {
+            type: Type.OBJECT,
+            properties: {
+              structure: { type: Type.INTEGER, description: 'Score 0-100 for PREP structural adherence' },
+              clarity: { type: Type.INTEGER, description: 'Score 0-100 for clarity and conciseness' },
+              logic: { type: Type.INTEGER, description: 'Score 0-100 for logical depth and cause-effect connection' },
+              grammar: { type: Type.INTEGER, description: 'Score 0-100 for grammatical accuracy' },
+              vocabulary: { type: Type.INTEGER, description: 'Score 0-100 for lexical richness and idiomatic collocations' },
             },
-            executiveSummary: {
-              type: Type.STRING,
-              description: 'Comprehensive constructive summary of performance in Chinese (2-3 sentences)',
-            },
-            stepAnalysis: {
-              type: Type.OBJECT,
-              properties: {
-                point: {
-                  type: Type.OBJECT,
-                  properties: {
-                    extractedText: { type: Type.STRING },
-                    status: { type: Type.STRING, description: '"excellent", "good", or "needs_improvement"' },
-                    critique: { type: Type.STRING, description: 'Detailed feedback on this point' },
-                    betterAlternative: { type: Type.STRING, description: 'A more powerful phrasing of the Point' },
-                  },
-                  required: ['extractedText', 'status', 'critique', 'betterAlternative'],
-                },
-                reason: {
-                  type: Type.OBJECT,
-                  properties: {
-                    extractedText: { type: Type.STRING },
-                    status: { type: Type.STRING, description: '"excellent", "good", or "needs_improvement"' },
-                    critique: { type: Type.STRING, description: 'Detailed feedback on the reason' },
-                    betterAlternative: { type: Type.STRING, description: 'A more compelling phrasing of the Reason' },
-                  },
-                  required: ['extractedText', 'status', 'critique', 'betterAlternative'],
-                },
-                example: {
-                  type: Type.OBJECT,
-                  properties: {
-                    extractedText: { type: Type.STRING },
-                    status: { type: Type.STRING, description: '"excellent", "good", or "needs_improvement"' },
-                    critique: { type: Type.STRING, description: 'Detailed feedback on the example' },
-                    betterAlternative: { type: Type.STRING, description: 'A more concrete phrasing of the Example' },
-                  },
-                  required: ['extractedText', 'status', 'critique', 'betterAlternative'],
-                },
-                point2: {
-                  type: Type.OBJECT,
-                  properties: {
-                    extractedText: { type: Type.STRING },
-                    status: { type: Type.STRING, description: '"excellent", "good", or "needs_improvement"' },
-                    critique: { type: Type.STRING, description: 'Detailed feedback on the restated point' },
-                    betterAlternative: { type: Type.STRING, description: 'A more impactful closing phrasing' },
-                  },
-                  required: ['extractedText', 'status', 'critique', 'betterAlternative'],
-                },
-              },
-              required: ['point', 'reason', 'example', 'point2'],
-            },
-            grammarCorrections: {
-              type: Type.ARRAY,
-              items: {
+            required: ['structure', 'clarity', 'logic', 'grammar', 'vocabulary'],
+          },
+          executiveSummary: {
+            type: Type.STRING,
+            description: 'Comprehensive constructive summary of performance in Chinese (2-3 sentences)',
+          },
+          stepAnalysis: {
+            type: Type.OBJECT,
+            properties: {
+              point: {
                 type: Type.OBJECT,
                 properties: {
-                  original: { type: Type.STRING, description: 'The exact problematic phrase or sentence segment' },
-                  corrected: { type: Type.STRING, description: 'The grammatically and idiomatically corrected version' },
-                  ruleExplanation: { type: Type.STRING, description: 'Explanation in Chinese of the rule or idiom' },
-                  category: { type: Type.STRING, description: '"grammar", "vocabulary", "collocation", or "transition"' },
+                  extractedText: { type: Type.STRING },
+                  status: { type: Type.STRING, description: '"excellent", "good", or "needs_improvement"' },
+                  critique: { type: Type.STRING, description: 'Detailed feedback on this point' },
+                  betterAlternative: { type: Type.STRING, description: 'A more powerful phrasing of the Point' },
                 },
-                required: ['original', 'corrected', 'ruleExplanation', 'category'],
+                required: ['extractedText', 'status', 'critique', 'betterAlternative'],
               },
-            },
-            polishedVersions: {
-              type: Type.OBJECT,
-              properties: {
-                businessProfessional: {
-                  type: Type.STRING,
-                  description: 'A polished, executive-ready version suitable for meetings, emails, or presentations',
-                },
-                conversationalFluent: {
-                  type: Type.STRING,
-                  description: 'A smooth, naturally flowing version suitable for networking or informal discussions',
-                },
-                concisePunchy: {
-                  type: Type.STRING,
-                  description: 'A compact 30-second elevator pitch version',
-                },
-              },
-              required: ['businessProfessional', 'conversationalFluent', 'concisePunchy'],
-            },
-            connectorsUsed: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-              description: 'Transitional connectors detected in user input',
-            },
-            recommendedConnectors: {
-              type: Type.ARRAY,
-              items: {
+              reason: {
                 type: Type.OBJECT,
                 properties: {
-                  step: { type: Type.STRING, description: '"P", "R", "E", or "P2"' },
-                  phrase: { type: Type.STRING },
-                  explanation: { type: Type.STRING },
-                  sampleSentence: { type: Type.STRING },
+                  extractedText: { type: Type.STRING },
+                  status: { type: Type.STRING, description: '"excellent", "good", or "needs_improvement"' },
+                  critique: { type: Type.STRING, description: 'Detailed feedback on the reason' },
+                  betterAlternative: { type: Type.STRING, description: 'A more compelling phrasing of the Reason' },
                 },
-                required: ['step', 'phrase', 'explanation', 'sampleSentence'],
+                required: ['extractedText', 'status', 'critique', 'betterAlternative'],
+              },
+              example: {
+                type: Type.OBJECT,
+                properties: {
+                  extractedText: { type: Type.STRING },
+                  status: { type: Type.STRING, description: '"excellent", "good", or "needs_improvement"' },
+                  critique: { type: Type.STRING, description: 'Detailed feedback on the example' },
+                  betterAlternative: { type: Type.STRING, description: 'A more concrete phrasing of the Example' },
+                },
+                required: ['extractedText', 'status', 'critique', 'betterAlternative'],
+              },
+              point2: {
+                type: Type.OBJECT,
+                properties: {
+                  extractedText: { type: Type.STRING },
+                  status: { type: Type.STRING, description: '"excellent", "good", or "needs_improvement"' },
+                  critique: { type: Type.STRING, description: 'Detailed feedback on the restated point' },
+                  betterAlternative: { type: Type.STRING, description: 'A more impactful closing phrasing' },
+                },
+                required: ['extractedText', 'status', 'critique', 'betterAlternative'],
               },
             },
-            shadowingAudioScript: {
-              type: Type.STRING,
-              description: 'A clean, well-paced script of the best revision for the user to practice reading aloud',
+            required: ['point', 'reason', 'example', 'point2'],
+          },
+          grammarCorrections: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                original: { type: Type.STRING, description: 'The exact problematic phrase or sentence segment' },
+                corrected: { type: Type.STRING, description: 'The grammatically and idiomatically corrected version' },
+                ruleExplanation: { type: Type.STRING, description: 'Explanation in Chinese of the rule or idiom' },
+                category: { type: Type.STRING, description: '"grammar", "vocabulary", "collocation", or "transition"' },
+              },
+              required: ['original', 'corrected', 'ruleExplanation', 'category'],
             },
           },
-          required: [
-            'overallScore',
-            'scores',
-            'executiveSummary',
-            'stepAnalysis',
-            'grammarCorrections',
-            'polishedVersions',
-            'recommendedConnectors',
-            'shadowingAudioScript',
-          ],
+          polishedVersions: {
+            type: Type.OBJECT,
+            properties: {
+              businessProfessional: {
+                type: Type.STRING,
+                description: 'A polished, executive-ready version suitable for meetings, emails, or presentations',
+              },
+              conversationalFluent: {
+                type: Type.STRING,
+                description: 'A smooth, naturally flowing version suitable for networking or informal discussions',
+              },
+              concisePunchy: {
+                type: Type.STRING,
+                description: 'A compact 30-second elevator pitch version',
+              },
+            },
+            required: ['businessProfessional', 'conversationalFluent', 'concisePunchy'],
+          },
+          connectorsUsed: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: 'Transitional connectors detected in user input',
+          },
+          recommendedConnectors: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                step: { type: Type.STRING, description: '"P", "R", "E", or "P2"' },
+                phrase: { type: Type.STRING },
+                explanation: { type: Type.STRING },
+                sampleSentence: { type: Type.STRING },
+              },
+              required: ['step', 'phrase', 'explanation', 'sampleSentence'],
+            },
+          },
+          shadowingAudioScript: {
+            type: Type.STRING,
+            description: 'A clean, well-paced script of the best revision for the user to practice reading aloud',
+          },
         },
+        required: [
+          'overallScore',
+          'scores',
+          'executiveSummary',
+          'stepAnalysis',
+          'grammarCorrections',
+          'polishedVersions',
+          'recommendedConnectors',
+          'shadowingAudioScript',
+        ],
       },
     });
 
-    const parsed = JSON.parse(response.text || '{}');
     res.json(parsed);
   } catch (error: any) {
     console.error('Error evaluating PREP submission:', error);
@@ -346,21 +413,14 @@ Return strict JSON format:
   "suggestedStarters": ["...", "...", "..."]
 }`;
 
-    const response = await generateContentWithFallback(
-      ai,
-      {
-        contents: prompt,
-        config: {
-          systemInstruction:
-            'You are a real-time English writing assistant. Return strict JSON. Help users improve their single PREP step immediately.',
-          responseMimeType: 'application/json',
-          maxOutputTokens: 500,
-        },
-      },
-      ['gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.8-flash']
-    );
-
-    const parsed = JSON.parse(response.text || '{}');
+    const systemInstruction =
+      'You are a real-time English writing assistant. Return strict JSON. Help users improve their single PREP step immediately.';
+    const parsed = await callLLMJson({
+      systemInstruction,
+      prompt,
+      maxTokens: 800,
+      temperature: 0.5,
+    });
     res.json(parsed);
   } catch (error: any) {
     console.error('Error in step check:', error);
@@ -402,14 +462,14 @@ Return strict JSON:
   ]
 }`;
 
-    const response = await generateContentWithFallback(ai, {
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-      },
+    const parsed = await callLLMJson({
+      systemInstruction:
+        'You are an engaging English conversation coach. Return valid JSON containing realistic everyday life practice topics.',
+      prompt,
+      maxTokens: 1500,
+      temperature: 0.8,
     });
 
-    const parsed = JSON.parse(response.text || '{}');
     res.json(parsed);
   } catch (error: any) {
     console.error('Error generating topics:', error);
@@ -467,21 +527,14 @@ Return a comprehensive, learner-friendly dictionary entry in strict JSON format:
   "prepTip": "In PREP, this word works great in the Reason step to explain psychological benefits, or in the Point step for a nuanced stance."
 }`;
 
-    const response = await generateContentWithFallback(
-      ai,
-      {
-        contents: prompt,
-        config: {
-          systemInstruction:
-            'You are an expert English-Chinese dictionary and vocabulary mentor. Output valid JSON strictly conforming to the requested schema. Ensure authentic native pronunciations and high-yield collocations.',
-          responseMimeType: 'application/json',
-          maxOutputTokens: 600,
-        },
-      },
-      ['gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.8-flash']
-    );
+    const parsed = await callLLMJson({
+      systemInstruction:
+        'You are an expert bilingual English-Chinese dictionary and vocabulary mentor. Output valid JSON strictly conforming to the requested schema. Ensure authentic native pronunciations and high-yield collocations.',
+      prompt,
+      maxTokens: 800,
+      temperature: 0.3,
+    });
 
-    const parsed = JSON.parse(response.text || '{}');
     if (parsed && parsed.word) {
       vocabCache.set(cacheKey, parsed);
     }
