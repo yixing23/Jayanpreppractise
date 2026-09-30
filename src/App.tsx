@@ -522,7 +522,14 @@ export default function App() {
       });
 
       if (!res.ok) {
-        throw new Error(`Server returned error: ${res.status}`);
+        let msg = `Server returned error: ${res.status}`;
+        try {
+          const errData = await res.json();
+          if (errData?.message || errData?.error) {
+            msg = `${errData.message || errData.error} (${res.status})`;
+          }
+        } catch {}
+        throw new Error(msg);
       }
 
       const data: EvaluationResult = await res.json();

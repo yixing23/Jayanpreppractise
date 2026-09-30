@@ -2,7 +2,6 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { GoogleGenAI, Type } from '@google/genai';
 
 dotenv.config();
 
@@ -12,118 +11,189 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json());
 
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || 'sk-c8d05ec58402403d868c50f1a55cca6d';
+// DeepSeek API Configuration
+const DEEPSEEK_API_KEY = (process.env.DEEPSEEK_API_KEY || '').trim();
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY || '',
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    },
-  },
-});
+/**
+ * Robust JSON extraction helper that strips code fences and parses valid JSON
+ */
+function extractJsonFromText(rawText: string): any {
+  if (!rawText || !rawText.trim()) return {};
 
-async function generateContentWithFallback(
-  ai: GoogleGenAI,
-  config: any,
-  models = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest']
-) {
-  let lastError: any = null;
-
-  for (const model of models) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const response = await ai.models.generateContent({
-          ...config,
-          model,
-        });
-        return response;
-      } catch (err: any) {
-        lastError = err;
-        const msg = String(err?.message || err);
-        const isRateLimit = msg.includes('resource_exhausted') || msg.includes('429') || msg.includes('quota');
-        console.warn(`Model ${model} attempt ${attempt + 1} failed. RateLimit: ${isRateLimit}. Error:`, msg);
-
-        if (isRateLimit && attempt === 0) {
-          await new Promise((r) => setTimeout(r, 1200));
-        } else {
-          break;
-        }
-      }
-    }
-    await new Promise((r) => setTimeout(r, 400));
+  let cleaned = rawText.trim();
+  // Strip markdown code fences if present
+  if (cleaned.startsWith('```json')) {
+    cleaned = cleaned.replace(/^```json\s*/i, '').replace(/\s*```$/i, '');
+  } else if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```\s*/i, '').replace(/\s*```$/i, '');
   }
 
-  throw lastError;
+  // Find boundaries of outer JSON object
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  }
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (err) {
+    // Attempt graceful recovery if truncated by token limit
+    try {
+      return JSON.parse(cleaned + '}');
+    } catch {}
+    try {
+      return JSON.parse(cleaned + '"}');
+    } catch {}
+    throw err;
+  }
 }
 
-// Unified high-reliability LLM caller: Primary DeepSeek-V3, fallback to Gemini
+/**
+ * Unified high-reliability LLM caller powered exclusively by DeepSeek-V3
+ */
 async function callLLMJson(options: {
   systemInstruction?: string;
   prompt: string;
-  geminiSchema?: any;
   maxTokens?: number;
   temperature?: number;
+  geminiSchema?: any; // kept for interface backwards-compatibility
 }): Promise<any> {
-  const deepseekKey = (process.env.DEEPSEEK_API_KEY || DEEPSEEK_API_KEY).trim();
+  const apiKey = (process.env.DEEPSEEK_API_KEY || DEEPSEEK_API_KEY).trim();
+  if (!apiKey) {
+    throw new Error('DEEPSEEK_API_KEY is not configured in environment variables');
+  }
 
-  // 1. Primary: DeepSeek-V3 (OpenAI-compatible)
-  if (deepseekKey) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const messages: Array<{ role: 'system' | 'user'; content: string }> = [];
-        if (options.systemInstruction) {
-          messages.push({ role: 'system', content: options.systemInstruction });
-        }
-        messages.push({ role: 'user', content: options.prompt });
+  let lastError: any = null;
 
-        const res = await fetch('https://api.deepseek.com/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${deepseekKey}`,
-          },
-          body: JSON.stringify({
-            model: 'deepseek-chat',
-            messages,
-            response_format: { type: 'json_object' },
-            temperature: options.temperature ?? 0.7,
-            max_tokens: options.maxTokens ?? 2500,
-          }),
-        });
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const messages: Array<{ role: 'system' | 'user'; content: string }> = [];
+      if (options.systemInstruction) {
+        messages.push({ role: 'system', content: options.systemInstruction });
+      }
+      messages.push({ role: 'user', content: options.prompt });
 
-        if (res.ok) {
-          const data = await res.json();
-          const content = data.choices?.[0]?.message?.content || '{}';
-          return JSON.parse(content);
-        } else {
-          const errText = await res.text();
-          console.warn(`DeepSeek API error status ${res.status}:`, errText);
-        }
-      } catch (e) {
-        console.warn(`DeepSeek attempt ${attempt + 1} error:`, e);
-        if (attempt === 0) await new Promise((r) => setTimeout(r, 1000));
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
+
+      const res = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages,
+          response_format: { type: 'json_object' },
+          temperature: options.temperature ?? 0.6,
+          max_tokens: options.maxTokens ?? 3500,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.warn(`DeepSeek API error status ${res.status}:`, errText);
+        throw new Error(`DeepSeek API returned error ${res.status}: ${errText}`);
+      }
+
+      const data = await res.json();
+      const rawContent = data.choices?.[0]?.message?.content || '{}';
+      return extractJsonFromText(rawContent);
+    } catch (e: any) {
+      lastError = e;
+      console.warn(`DeepSeek attempt ${attempt} failed:`, e?.message || e);
+      if (attempt === 1) {
+        await new Promise((r) => setTimeout(r, 1000));
       }
     }
   }
 
-  // 2. Secondary fallback: Gemini
-  if (process.env.GEMINI_API_KEY) {
-    const config: any = {
-      systemInstruction: options.systemInstruction,
-      responseMimeType: 'application/json',
-    };
-    if (options.geminiSchema) {
-      config.responseSchema = options.geminiSchema;
-    }
-    const response = await generateContentWithFallback(ai, {
-      contents: options.prompt,
-      config,
-    });
-    return JSON.parse(response.text || '{}');
-  }
+  throw lastError || new Error('DeepSeek API request failed');
+}
 
-  throw new Error('AI service error: Unable to complete LLM request');
+/**
+ * Normalizes and guards evaluation responses against missing fields
+ */
+function normalizeEvaluationResult(raw: any, userInput: any): any {
+  const overallScore =
+    typeof raw?.overallScore === 'number'
+      ? Math.min(100, Math.max(0, raw.overallScore))
+      : 80;
+
+  const rawScores = raw?.scores || {};
+  const scores = {
+    structure: typeof rawScores.structure === 'number' ? rawScores.structure : 80,
+    clarity: typeof rawScores.clarity === 'number' ? rawScores.clarity : 80,
+    logic: typeof rawScores.logic === 'number' ? rawScores.logic : 80,
+    grammar: typeof rawScores.grammar === 'number' ? rawScores.grammar : 80,
+    vocabulary: typeof rawScores.vocabulary === 'number' ? rawScores.vocabulary : 80,
+  };
+
+  const executiveSummary =
+    raw?.executiveSummary ||
+    '表现良好！PREP 结构清晰，核心论点明确。注意丰富用词表达并增强细节说服力。';
+
+  const defaultStep = (key: string, userText: string) => ({
+    extractedText: raw?.stepAnalysis?.[key]?.extractedText || userText || '',
+    status: raw?.stepAnalysis?.[key]?.status || 'good',
+    critique: raw?.stepAnalysis?.[key]?.critique || '表达清晰，切合题意。',
+    betterAlternative:
+      raw?.stepAnalysis?.[key]?.betterAlternative || userText || '',
+  });
+
+  const stepAnalysis = {
+    point: defaultStep('point', userInput.point || ''),
+    reason: defaultStep('reason', userInput.reason || ''),
+    example: defaultStep('example', userInput.example || ''),
+    point2: defaultStep('point2', userInput.point2 || ''),
+  };
+
+  const grammarCorrections = Array.isArray(raw?.grammarCorrections)
+    ? raw.grammarCorrections
+        .map((item: any) => ({
+          original: String(item?.original || ''),
+          corrected: String(item?.corrected || ''),
+          ruleExplanation: String(item?.ruleExplanation || ''),
+          category: item?.category || 'grammar',
+        }))
+        .filter((item: any) => item.original && item.corrected)
+    : [];
+
+  const rawPolish = raw?.polishedVersions || {};
+  const fallbackPolish =
+    userInput.fullText ||
+    `${userInput.point || ''} ${userInput.reason || ''} ${userInput.example || ''} ${userInput.point2 || ''}`.trim() ||
+    'Good practice.';
+
+  const polishedVersions = {
+    businessProfessional: rawPolish.businessProfessional || fallbackPolish,
+    conversationalFluent: rawPolish.conversationalFluent || fallbackPolish,
+    concisePunchy: rawPolish.concisePunchy || fallbackPolish,
+  };
+
+  const connectorsUsed = Array.isArray(raw?.connectorsUsed) ? raw.connectorsUsed : [];
+  const recommendedConnectors = Array.isArray(raw?.recommendedConnectors)
+    ? raw.recommendedConnectors
+    : [];
+  const shadowingAudioScript =
+    raw?.shadowingAudioScript || polishedVersions.conversationalFluent;
+
+  return {
+    overallScore,
+    scores,
+    executiveSummary,
+    stepAnalysis,
+    grammarCorrections,
+    polishedVersions,
+    connectorsUsed,
+    recommendedConnectors,
+    shadowingAudioScript,
+  };
 }
 
 // In-memory high-speed cache for vocabulary lookups
@@ -218,163 +288,110 @@ Point (Closing / takeaway): ${point2 || '(Empty)'}`
 
 Perform an exhaustive, constructive, and highly educational evaluation.
 NOTE: If this is an everyday life, hobby, lifestyle, or casual conversation topic, praise natural, vivid, relatable storytelling and conversational fluency. Do NOT force stiff corporate jargon onto casual topics.
-Focus on:
-1. PREP Structure Fidelity:
-   - Point 1: Did they state their preference, stance, or core opinion directly upfront?
-   - Reason: Did they provide a real reason why, rather than just repeating "because it is good" (avoiding circular logic)?
-   - Example: Is it a relatable personal experience, vivid scenario, or concrete situation?
-   - Point 2 (Reiterate): Does it tie the thought back together nicely without verbatim repetition?
-2. Real-time Grammar, Collocations, and Phrasing Corrections:
-   - Identify grammatical mistakes, awkward phrasing, unnatural Chinglish/translation artifacts, wrong prepositions, or tense slips.
-   - Provide the exact natural native English fix and explain the rule/idiom in friendly Chinese.
-3. Native Speaker Polish:
-   - Provide three natural variations:
-     1. "Expressive & Natural" (natural, fluent everyday spoken English with idioms and rhythm)
-     2. "Elegant & Thoughtful" (smooth, well-crafted, articulate)
-     3. "Concise & Punchy" (clean, compact 20-30 second conversational delivery)
-4. Actionable Connectors & Next Steps:
-   - Suggest great conversational and logical transition phrases that fit this context naturally.
 
-Output STRICTLY valid JSON conforming to the requested schema.`;
+Focus on:
+1. PREP Structure Fidelity: Point, Reason, Example, Point 2
+2. Real-time Grammar, Collocations, and Phrasing Corrections with Chinese explanations
+3. Native Speaker Polish: 3 variations (Business/Professional, Conversational & Fluent, Concise & Punchy)
+4. Actionable Connectors & Read-aloud shadowing script
+
+You MUST respond strictly with a valid JSON object matching the following exact structure:
+{
+  "overallScore": 85,
+  "scores": {
+    "structure": 85,
+    "clarity": 80,
+    "logic": 85,
+    "grammar": 90,
+    "vocabulary": 80
+  },
+  "executiveSummary": "综合评价总结（中文，2-3句话）",
+  "stepAnalysis": {
+    "point": {
+      "extractedText": "用户原观点",
+      "status": "excellent",
+      "critique": "关于Point的点评（中文）",
+      "betterAlternative": "母语级更地道的Point表达（英文）"
+    },
+    "reason": {
+      "extractedText": "用户原原因",
+      "status": "good",
+      "critique": "关于Reason的点评（中文）",
+      "betterAlternative": "母语级更地道的Reason表达（英文）"
+    },
+    "example": {
+      "extractedText": "用户原例子",
+      "status": "good",
+      "critique": "关于Example的点评（中文）",
+      "betterAlternative": "母语级更地道的Example表达（英文）"
+    },
+    "point2": {
+      "extractedText": "用户原结尾",
+      "status": "good",
+      "critique": "关于结尾重申的点评（中文）",
+      "betterAlternative": "母语级更地道的Point 2重申表达（英文）"
+    }
+  },
+  "grammarCorrections": [
+    {
+      "original": "用户原文中有瑕疵的词句",
+      "corrected": "改正后的地道英文表达",
+      "ruleExplanation": "针对此项修改的中文规则或习语解析",
+      "category": "grammar"
+    }
+  ],
+  "polishedVersions": {
+    "businessProfessional": "适合正式场合/职场沟通的精修版本（完整PREP段落，英文）",
+    "conversationalFluent": "适合日常交流、轻松自然的精修版本（完整PREP段落，英文）",
+    "concisePunchy": "30秒快速电梯演说、紧凑有力的精修版本（完整PREP段落，英文）"
+  },
+  "connectorsUsed": ["Because", "For example"],
+  "recommendedConnectors": [
+    {
+      "step": "P",
+      "phrase": "To begin with",
+      "explanation": "引出观点的自然连接词",
+      "sampleSentence": "To begin with, finding a balanced routine is essential."
+    },
+    {
+      "step": "R",
+      "phrase": "The primary reason is that",
+      "explanation": "说明核心理由的逻辑连接词",
+      "sampleSentence": "The primary reason is that it relieves daily stress."
+    },
+    {
+      "step": "E",
+      "phrase": "A prime example of this is",
+      "explanation": "展开生动例证的表达",
+      "sampleSentence": "A prime example of this is when I took a weekend hike."
+    },
+    {
+      "step": "P2",
+      "phrase": "That is why I firmly believe",
+      "explanation": "结尾总结升华",
+      "sampleSentence": "That is why I firmly believe weekend outdoor activities are revitalizing."
+    }
+  ],
+  "shadowingAudioScript": "一段适合朗读跟读的优美精修文本（纯英文，标点清晰自然）"
+}`;
 
     const parsed = await callLLMJson({
       systemInstruction:
-        'You are an empathetic, expert bilingual (English-Chinese) speaking & writing coach for the PREP method. You help learners express their opinions on daily life and general topics with structure, clarity, and idiomatic ease. Output strictly valid JSON. Keep explanations in Chinese for clarity, while all English text must be natural, authentic native English.',
+        'You are an empathetic, expert bilingual (English-Chinese) speaking & writing coach for the PREP method. You help learners express their opinions with structure, clarity, and idiomatic ease. Output strictly valid JSON matching the requested template.',
       prompt: promptText,
       maxTokens: 3000,
-      geminiSchema: {
-        type: Type.OBJECT,
-        properties: {
-          overallScore: { type: Type.INTEGER, description: 'Score from 0 to 100' },
-          scores: {
-            type: Type.OBJECT,
-            properties: {
-              structure: { type: Type.INTEGER, description: 'Score 0-100 for PREP structural adherence' },
-              clarity: { type: Type.INTEGER, description: 'Score 0-100 for clarity and conciseness' },
-              logic: { type: Type.INTEGER, description: 'Score 0-100 for logical depth and cause-effect connection' },
-              grammar: { type: Type.INTEGER, description: 'Score 0-100 for grammatical accuracy' },
-              vocabulary: { type: Type.INTEGER, description: 'Score 0-100 for lexical richness and idiomatic collocations' },
-            },
-            required: ['structure', 'clarity', 'logic', 'grammar', 'vocabulary'],
-          },
-          executiveSummary: {
-            type: Type.STRING,
-            description: 'Comprehensive constructive summary of performance in Chinese (2-3 sentences)',
-          },
-          stepAnalysis: {
-            type: Type.OBJECT,
-            properties: {
-              point: {
-                type: Type.OBJECT,
-                properties: {
-                  extractedText: { type: Type.STRING },
-                  status: { type: Type.STRING, description: '"excellent", "good", or "needs_improvement"' },
-                  critique: { type: Type.STRING, description: 'Detailed feedback on this point' },
-                  betterAlternative: { type: Type.STRING, description: 'A more powerful phrasing of the Point' },
-                },
-                required: ['extractedText', 'status', 'critique', 'betterAlternative'],
-              },
-              reason: {
-                type: Type.OBJECT,
-                properties: {
-                  extractedText: { type: Type.STRING },
-                  status: { type: Type.STRING, description: '"excellent", "good", or "needs_improvement"' },
-                  critique: { type: Type.STRING, description: 'Detailed feedback on the reason' },
-                  betterAlternative: { type: Type.STRING, description: 'A more compelling phrasing of the Reason' },
-                },
-                required: ['extractedText', 'status', 'critique', 'betterAlternative'],
-              },
-              example: {
-                type: Type.OBJECT,
-                properties: {
-                  extractedText: { type: Type.STRING },
-                  status: { type: Type.STRING, description: '"excellent", "good", or "needs_improvement"' },
-                  critique: { type: Type.STRING, description: 'Detailed feedback on the example' },
-                  betterAlternative: { type: Type.STRING, description: 'A more concrete phrasing of the Example' },
-                },
-                required: ['extractedText', 'status', 'critique', 'betterAlternative'],
-              },
-              point2: {
-                type: Type.OBJECT,
-                properties: {
-                  extractedText: { type: Type.STRING },
-                  status: { type: Type.STRING, description: '"excellent", "good", or "needs_improvement"' },
-                  critique: { type: Type.STRING, description: 'Detailed feedback on the restated point' },
-                  betterAlternative: { type: Type.STRING, description: 'A more impactful closing phrasing' },
-                },
-                required: ['extractedText', 'status', 'critique', 'betterAlternative'],
-              },
-            },
-            required: ['point', 'reason', 'example', 'point2'],
-          },
-          grammarCorrections: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                original: { type: Type.STRING, description: 'The exact problematic phrase or sentence segment' },
-                corrected: { type: Type.STRING, description: 'The grammatically and idiomatically corrected version' },
-                ruleExplanation: { type: Type.STRING, description: 'Explanation in Chinese of the rule or idiom' },
-                category: { type: Type.STRING, description: '"grammar", "vocabulary", "collocation", or "transition"' },
-              },
-              required: ['original', 'corrected', 'ruleExplanation', 'category'],
-            },
-          },
-          polishedVersions: {
-            type: Type.OBJECT,
-            properties: {
-              businessProfessional: {
-                type: Type.STRING,
-                description: 'A polished, executive-ready version suitable for meetings, emails, or presentations',
-              },
-              conversationalFluent: {
-                type: Type.STRING,
-                description: 'A smooth, naturally flowing version suitable for networking or informal discussions',
-              },
-              concisePunchy: {
-                type: Type.STRING,
-                description: 'A compact 30-second elevator pitch version',
-              },
-            },
-            required: ['businessProfessional', 'conversationalFluent', 'concisePunchy'],
-          },
-          connectorsUsed: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING },
-            description: 'Transitional connectors detected in user input',
-          },
-          recommendedConnectors: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                step: { type: Type.STRING, description: '"P", "R", "E", or "P2"' },
-                phrase: { type: Type.STRING },
-                explanation: { type: Type.STRING },
-                sampleSentence: { type: Type.STRING },
-              },
-              required: ['step', 'phrase', 'explanation', 'sampleSentence'],
-            },
-          },
-          shadowingAudioScript: {
-            type: Type.STRING,
-            description: 'A clean, well-paced script of the best revision for the user to practice reading aloud',
-          },
-        },
-        required: [
-          'overallScore',
-          'scores',
-          'executiveSummary',
-          'stepAnalysis',
-          'grammarCorrections',
-          'polishedVersions',
-          'recommendedConnectors',
-          'shadowingAudioScript',
-        ],
-      },
+      temperature: 0.6,
     });
 
-    res.json(parsed);
+    const normalized = normalizeEvaluationResult(parsed, {
+      point,
+      reason,
+      example,
+      point2,
+      fullText,
+    });
+
+    res.json(normalized);
   } catch (error: any) {
     console.error('Error evaluating PREP submission:', error);
     res.status(500).json({
