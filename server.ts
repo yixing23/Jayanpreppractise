@@ -558,6 +558,109 @@ Return a comprehensive, learner-friendly dictionary entry in strict JSON format:
   }
 });
 
+// --- Cross-Device Cloud Sync Endpoints (Upstash Redis / Vercel KV / In-Memory Fallback) ---
+const inMemorySyncStore = new Map<string, { vocab: any[]; history: any[]; updatedAt: number }>();
+
+async function getSyncData(code: string): Promise<{ vocab: any[]; history: any[]; updatedAt: number } | null> {
+  const cleanCode = code.trim().toLowerCase();
+  const kvUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+
+  if (kvUrl && kvToken) {
+    try {
+      const res = await fetch(`${kvUrl}/get/prep_sync_${encodeURIComponent(cleanCode)}`, {
+        headers: { Authorization: `Bearer ${kvToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.result) {
+          return typeof data.result === 'string' ? JSON.parse(data.result) : data.result;
+        }
+      }
+    } catch (err) {
+      console.warn('KV get failed, using fallback:', err);
+    }
+  }
+
+  return inMemorySyncStore.get(cleanCode) || null;
+}
+
+async function saveSyncData(
+  code: string,
+  payload: { vocab: any[]; history: any[]; updatedAt: number }
+): Promise<boolean> {
+  const cleanCode = code.trim().toLowerCase();
+  inMemorySyncStore.set(cleanCode, payload);
+
+  const kvUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+
+  if (kvUrl && kvToken) {
+    try {
+      const res = await fetch(`${kvUrl}/set/prep_sync_${encodeURIComponent(cleanCode)}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${kvToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      return res.ok;
+    } catch (err) {
+      console.warn('KV set failed, fallback saved in memory:', err);
+    }
+  }
+
+  return true;
+}
+
+// 1. Pull data by sync code
+app.post('/api/sync/pull', async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code || typeof code !== 'string' || !code.trim()) {
+      return res.status(400).json({ error: 'Sync code is required' });
+    }
+
+    const data = await getSyncData(code);
+    res.json({
+      success: true,
+      exists: !!data,
+      data: data || { vocab: [], history: [], updatedAt: 0 },
+    });
+  } catch (error: any) {
+    console.error('Error pulling sync data:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 2. Push data by sync code
+app.post('/api/sync/push', async (req, res) => {
+  try {
+    const { code, data } = req.body;
+    if (!code || typeof code !== 'string' || !code.trim()) {
+      return res.status(400).json({ error: 'Sync code is required' });
+    }
+
+    const vocab = Array.isArray(data?.vocab) ? data.vocab : [];
+    const history = Array.isArray(data?.history) ? data.history : [];
+    const updatedAt = typeof data?.updatedAt === 'number' ? data.updatedAt : Date.now();
+
+    const payload = { vocab, history, updatedAt };
+    await saveSyncData(code, payload);
+
+    res.json({
+      success: true,
+      updatedAt,
+      vocabCount: vocab.length,
+      historyCount: history.length,
+    });
+  } catch (error: any) {
+    console.error('Error pushing sync data:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 async function startServer() {
   const isProd = process.env.NODE_ENV === 'production';
   if (isProd) {

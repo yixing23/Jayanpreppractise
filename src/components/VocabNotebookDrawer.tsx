@@ -34,6 +34,8 @@ interface VocabNotebookDrawerProps {
   onToggleMastered: (id: string) => void;
   onToggleStarred: (id: string) => void;
   onImportWords: (imported: VocabWord[]) => void;
+  onOpenSyncModal?: () => void;
+  syncCode?: string | null;
 }
 
 export const VocabNotebookDrawer: React.FC<VocabNotebookDrawerProps> = ({
@@ -47,6 +49,8 @@ export const VocabNotebookDrawer: React.FC<VocabNotebookDrawerProps> = ({
   onToggleMastered,
   onToggleStarred,
   onImportWords,
+  onOpenSyncModal,
+  syncCode,
 }) => {
   const [activeTab, setActiveTab] = useState<'list' | 'flashcards' | 'sync'>('list');
   const [searchQuery, setSearchQuery] = useState('');
@@ -579,19 +583,52 @@ export const VocabNotebookDrawer: React.FC<VocabNotebookDrawerProps> = ({
           </div>
         )}
 
-        {/* 3. CLOUD SYNC & DATA MANAGEMENT (规划模式) */}
+        {/* 3. CLOUD SYNC & DATA MANAGEMENT */}
         {activeTab === 'sync' && (
-          <div className="flex-1 p-5 overflow-y-auto space-y-5 text-xs">
+          <div className="flex-1 p-5 overflow-y-auto space-y-4 text-xs">
+            {/* Realtime Cross-Device Sync Card */}
+            <div className="p-4 rounded-2xl liquid-glass-subtle border border-zinc-200/80 space-y-3 bg-white/80">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${syncCode ? 'bg-emerald-500/10 text-emerald-600' : 'bg-black text-white'}`}>
+                    <Cloud className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-zinc-950 text-xs">跨设备多端实时同步</h4>
+                    <p className="text-[11px] text-zinc-500">
+                      {syncCode ? `已关联暗号: ${syncCode}` : '未关联多端同步'}
+                    </p>
+                  </div>
+                </div>
+                {syncCode && (
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-full">
+                    已连接
+                  </span>
+                )}
+              </div>
+
+              {onOpenSyncModal && (
+                <button
+                  type="button"
+                  onClick={onOpenSyncModal}
+                  className="w-full py-2.5 px-3 bg-black text-white hover:bg-zinc-800 rounded-xl font-semibold flex items-center justify-center gap-1.5 transition-all text-xs active-press"
+                >
+                  <Cloud className="w-3.5 h-3.5" />
+                  <span>{syncCode ? '管理同步暗号与设备' : '设置专属暗号并同步'}</span>
+                </button>
+              )}
+            </div>
+
             {/* Status card */}
             <div className="p-4 rounded-2xl liquid-glass-subtle border border-white/80 space-y-1.5">
               <div className="flex items-center gap-2">
                 <Cloud className="w-4 h-4 text-zinc-900" />
                 <h3 className="font-bold text-zinc-950 text-xs">
-                  云端同步计划与多端数据桥接
+                  本地优先与多端互联
                 </h3>
               </div>
               <p className="text-zinc-600 text-[11px] leading-relaxed">
-                按照您的规划方案：当前生词本已开启<strong>本地持久化优先（Local-First Storage）</strong>，支持随时一键导入/导出标准 JSON 文件，或对接您另一款 APP 的同步服务端点。
+                当前生词本已开启<strong>本地持久化优先（Local-First Storage）</strong>，支持设置专属暗号自动同步，也可以随时导出标准 JSON 文件备份。
               </p>
             </div>
 

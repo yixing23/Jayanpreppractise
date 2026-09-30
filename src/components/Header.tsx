@@ -1,5 +1,4 @@
-import React from 'react';
-import { BookOpen, History, Sparkles, Layers, FileText } from 'lucide-react';
+import { BookOpen, History, Sparkles, Layers, FileText, Cloud } from 'lucide-react';
 
 interface HeaderProps {
   mode: 'step' | 'full';
@@ -9,6 +8,9 @@ interface HeaderProps {
   historyCount: number;
   onOpenVocab: () => void;
   vocabCount: number;
+  onOpenSync: () => void;
+  syncCode: string | null;
+  isSyncing?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -19,6 +21,9 @@ export const Header: React.FC<HeaderProps> = ({
   historyCount,
   onOpenVocab,
   vocabCount,
+  onOpenSync,
+  syncCode,
+  isSyncing = false,
 }) => {
   return (
     <header className="sticky top-0 z-30 liquid-glass-nav transition-all border-b border-white/60">
@@ -118,6 +123,22 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="absolute -top-1 -right-1 sm:static sm:top-auto sm:right-auto sm:ml-1 min-w-3.5 sm:min-w-4 h-3.5 sm:h-4 px-1 bg-zinc-800 text-white text-[9px] sm:text-[10px] font-bold rounded-full flex items-center justify-center shrink-0">
                   {historyCount > 9 ? '9+' : historyCount}
                 </span>
+              )}
+            </button>
+
+            {/* Cloud Sync Button */}
+            <button
+              type="button"
+              onClick={onOpenSync}
+              className={`flex items-center justify-center w-7 h-7 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 text-xs font-medium liquid-glass-pill rounded-full shrink-0 relative active-press ${
+                syncCode ? 'text-emerald-700 bg-emerald-50/70 border border-emerald-400/40' : 'text-zinc-700 hover:text-black'
+              }`}
+              title={syncCode ? `多端同步已连接 (${syncCode})` : '设置跨设备云同步'}
+            >
+              <Cloud className={`w-3.5 h-3.5 shrink-0 ${syncCode ? 'text-emerald-600' : 'text-zinc-600'} ${isSyncing ? 'animate-pulse' : ''}`} />
+              <span className="hidden md:inline ml-1">{syncCode ? '已同步' : '同步'}</span>
+              {syncCode && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ml-1 hidden sm:inline-block" />
               )}
             </button>
           </div>

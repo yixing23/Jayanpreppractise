@@ -12,6 +12,7 @@ import { HistoryDrawer } from './components/HistoryDrawer';
 import { VocabNotebookDrawer } from './components/VocabNotebookDrawer';
 import { VocabDetailModal } from './components/VocabDetailModal';
 import { SelectionLookupTooltip } from './components/SelectionLookupTooltip';
+import { SyncModal } from './components/SyncModal';
 import { Sparkles, Layers, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function App() {
@@ -255,6 +256,163 @@ export default function App() {
     }
   }, [history]);
 
+  // Cloud Sync state & helpers
+  const [showSyncModal, setShowSyncModal] = useState<boolean>(false);
+  const [syncCode, setSyncCode] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('prep_sync_code') || null;
+    } catch {
+      return null;
+    }
+  });
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(() => {
+    try {
+      const saved = localStorage.getItem('prep_last_synced_at');
+      return saved ? parseInt(saved, 10) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Smart merge helpers
+  const smartMergeVocab = (local: VocabWord[], remote: VocabWord[]): VocabWord[] => {
+    const map = new Map<string, VocabWord>();
+    remote.forEach((w) => {
+      if (w && w.word) {
+        map.set(w.word.toLowerCase().trim(), w);
+      }
+    });
+    local.forEach((w) => {
+      if (w && w.word) {
+        const key = w.word.toLowerCase().trim();
+        const existing = map.get(key);
+        if (!existing) {
+          map.set(key, w);
+        } else {
+          map.set(key, {
+            ...existing,
+            ...w,
+            starred: existing.starred || w.starred,
+            mastered: existing.mastered || w.mastered,
+            addedAt: Math.max(existing.addedAt || 0, w.addedAt || 0) || Date.now(),
+          });
+        }
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+  };
+
+  const smartMergeHistory = (local: PracticeHistoryItem[], remote: PracticeHistoryItem[]): PracticeHistoryItem[] => {
+    const map = new Map<string, PracticeHistoryItem>();
+    remote.forEach((h) => {
+      if (h && h.id) map.set(h.id, h);
+    });
+    local.forEach((h) => {
+      if (h && h.id) map.set(h.id, h);
+    });
+    return Array.from(map.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 50);
+  };
+
+  // Perform full sync cycle (Pull -> Merge -> Push)
+  const performSync = async (codeToUse?: string, notify: boolean = true): Promise<boolean> => {
+    const activeCode = (codeToUse || syncCode)?.trim().toLowerCase();
+    if (!activeCode) return false;
+
+    setIsSyncing(true);
+    try {
+      // 1. Pull remote data
+      const pullRes = await fetch('/api/sync/pull', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: activeCode }),
+      });
+
+      if (!pullRes.ok) throw new Error('Pull failed');
+      const pullData = await pullRes.json();
+      const remoteVocab: VocabWord[] = pullData?.data?.vocab || [];
+      const remoteHistory: PracticeHistoryItem[] = pullData?.data?.history || [];
+
+      // 2. Smart merge
+      const mergedVocab = smartMergeVocab(vocabWords, remoteVocab);
+      const mergedHistory = smartMergeHistory(history, remoteHistory);
+      const now = Date.now();
+
+      // 3. Push merged data back to remote
+      await fetch('/api/sync/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: activeCode,
+          data: {
+            vocab: mergedVocab,
+            history: mergedHistory,
+            updatedAt: now,
+          },
+        }),
+      });
+
+      // 4. Update local state
+      setVocabWords(mergedVocab);
+      setHistory(mergedHistory);
+      setSyncCode(activeCode);
+      setLastSyncedAt(now);
+      localStorage.setItem('prep_sync_code', activeCode);
+      localStorage.setItem('prep_last_synced_at', now.toString());
+
+      if (notify) {
+        showToast(`已成功同步！生词 ${mergedVocab.length} 个，打卡 ${mergedHistory.length} 次`);
+      }
+      return true;
+    } catch (err) {
+      console.warn('Sync failed:', err);
+      if (notify) {
+        showToast('云同步连接异常，数据已暂存本地');
+      }
+      return false;
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleDisconnectSync = () => {
+    setSyncCode(null);
+    setLastSyncedAt(null);
+    try {
+      localStorage.removeItem('prep_sync_code');
+      localStorage.removeItem('prep_last_synced_at');
+    } catch (e) {}
+    showToast('已断开云同步（本地数据已安全保留）');
+  };
+
+  // Background auto-sync on mount if syncCode is configured
+  useEffect(() => {
+    if (syncCode) {
+      performSync(syncCode, false);
+    }
+  }, []);
+
+  // Auto-sync debounced push on changes when syncCode is connected
+  useEffect(() => {
+    if (!syncCode) return;
+    const timer = setTimeout(() => {
+      fetch('/api/sync/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: syncCode,
+          data: {
+            vocab: vocabWords,
+            history,
+            updatedAt: Date.now(),
+          },
+        }),
+      }).catch((e) => console.warn('Background sync push failed:', e));
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [vocabWords, history, syncCode]);
+
   // Topic selection
   const handleSelectTopic = (topic: Topic) => {
     setCurrentTopic(topic);
@@ -487,6 +645,9 @@ export default function App() {
         historyCount={history.length}
         onOpenVocab={() => setShowVocabDrawer(true)}
         vocabCount={vocabWords.length}
+        onOpenSync={() => setShowSyncModal(true)}
+        syncCode={syncCode}
+        isSyncing={isSyncing}
       />
 
       {/* Floating Tooltip for Word Selection Lookup */}
@@ -671,6 +832,8 @@ export default function App() {
         onToggleMastered={handleToggleMastered}
         onToggleStarred={handleToggleStarred}
         onImportWords={handleImportWords}
+        onOpenSyncModal={() => setShowSyncModal(true)}
+        syncCode={syncCode}
       />
 
       {/* Vocabulary Word Detail & Lookup Modal */}
@@ -691,6 +854,24 @@ export default function App() {
         onDirectAddWord={handleDirectAddWord}
         onToggleMastered={handleToggleMastered}
         onToggleStarred={handleToggleStarred}
+      />
+
+      {/* Cloud Sync Modal */}
+      <SyncModal
+        isOpen={showSyncModal}
+        onClose={() => setShowSyncModal(false)}
+        syncCode={syncCode}
+        onConnectSync={async (code) => {
+          return await performSync(code, true);
+        }}
+        onDisconnectSync={handleDisconnectSync}
+        onManualSync={async () => {
+          await performSync(undefined, true);
+        }}
+        isSyncing={isSyncing}
+        lastSyncedAt={lastSyncedAt}
+        vocabCount={vocabWords.length}
+        historyCount={history.length}
       />
     </div>
   );
