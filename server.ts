@@ -574,10 +574,16 @@ async function startServer() {
     app.use(vite.middlewares);
   }
 
-  const PORT = 3000;
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`PREP Master server running on http://0.0.0.0:${PORT}`);
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`PREP Master server running on port ${PORT}`);
   });
 }
 
-startServer();
+// Export Express app for Vercel Serverless Function
+export default app;
+
+// Only start standalone HTTP server if not running in Vercel Serverless environment
+if (!process.env.VERCEL) {
+  startServer();
+}
