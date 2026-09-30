@@ -1,148 +1,218 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BookMarked, Sparkles } from 'lucide-react';
+import { BookMarked, Sparkles, Check } from 'lucide-react';
+import { VocabWord } from '../types/prep';
 
 interface SelectionLookupTooltipProps {
   onLookupWord: (word: string, context?: string) => void;
   onDirectAddWord?: (word: string, context?: string) => void;
+  savedWords?: VocabWord[];
+}
+
+/**
+ * Clean raw selected string by removing leading/trailing punctuation, quotes and whitespace
+ */
+function sanitizeSelectedWord(raw: string): string {
+  if (!raw) return '';
+  return raw
+    .trim()
+    .replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '')
+    .trim();
 }
 
 export const SelectionLookupTooltip: React.FC<SelectionLookupTooltipProps> = ({
   onLookupWord,
   onDirectAddWord,
+  savedWords = [],
 }) => {
   const [visible, setVisible] = useState(false);
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [selectedText, setSelectedText] = useState('');
+  const [selectedWord, setSelectedWord] = useState('');
   const [contextSentence, setContextSentence] = useState('');
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleSelection = () => {
+      // 1. Check window selection
       const selection = window.getSelection();
-      if (!selection || selection.isCollapsed) {
+      let rawText = '';
+      let rect: DOMRect | null = null;
+      let surrounding = '';
+
+      if (selection && !selection.isCollapsed && selection.rangeCount > 0) {
+        rawText = selection.toString();
+        try {
+          const range = selection.getRangeAt(0);
+          rect = range.getBoundingClientRect();
+
+          // Try to extract surrounding sentence
+          const parent = selection.anchorNode?.parentElement;
+          if (parent) {
+            const fullParagraph = parent.innerText || '';
+            const sentences = fullParagraph.split(/[.!?\n]+/);
+            const found = sentences.find((s) => s.includes(rawText.trim()));
+            if (found) surrounding = found.trim();
+          }
+        } catch {}
+      }
+
+      // 2. Check input/textarea selection if window selection is empty
+      const activeEl = document.activeElement;
+      if (
+        (!rawText || !rawText.trim()) &&
+        activeEl &&
+        (activeEl instanceof HTMLTextAreaElement || activeEl instanceof HTMLInputElement)
+      ) {
+        const start = activeEl.selectionStart || 0;
+        const end = activeEl.selectionEnd || 0;
+        if (end > start) {
+          rawText = activeEl.value.substring(start, end);
+          rect = activeEl.getBoundingClientRect();
+          surrounding = activeEl.value;
+        }
+      }
+
+      if (!rawText || !rawText.trim() || !rect || (rect.width === 0 && rect.height === 0)) {
         setVisible(false);
         return;
       }
 
-      const text = selection.toString().trim();
-      // Valid word or short phrase: 1 to 5 words, letters/hyphens/spaces
-      const wordCount = text.split(/\s+/).filter(Boolean).length;
-      if (text.length >= 2 && text.length <= 40 && wordCount <= 4 && /^[a-zA-Z\s'-]+$/.test(text)) {
-        try {
-          const range = selection.getRangeAt(0);
-          const rect = range.getBoundingClientRect();
+      // Sanitize text
+      const cleaned = sanitizeSelectedWord(rawText);
+      const wordCount = cleaned.split(/\s+/).filter(Boolean).length;
 
-          if (rect.width === 0 && rect.height === 0) return;
+      // Validate: 2 to 45 chars, max 4 words, English characters
+      const isEnglishWordOrPhrase =
+        cleaned.length >= 2 &&
+        cleaned.length <= 45 &&
+        wordCount >= 1 &&
+        wordCount <= 4 &&
+        /^[a-zA-Z]+([-\s'][a-zA-Z]+)*$/.test(cleaned);
 
-          // Get enclosing sentence if possible
-          const anchorNode = selection.anchorNode;
-          const parentText = anchorNode?.parentElement?.innerText || '';
-          let surroundingSentence = '';
-          if (parentText) {
-            const sentences = parentText.split(/[.!?\n]/);
-            const found = sentences.find((s) => s.includes(text));
-            if (found) surroundingSentence = found.trim();
-          }
-
-          setSelectedText(text);
-          setContextSentence(surroundingSentence);
-
-          const isMobile = window.innerWidth < 640;
-          const tooltipWidth = isMobile ? 180 : 190;
-          const tooltipHeight = 44;
-
-          // Horizontal alignment centered around selection with margin guards
-          let targetX = rect.left + rect.width / 2 - tooltipWidth / 2;
-          targetX = Math.max(12, Math.min(window.innerWidth - tooltipWidth - 12, targetX));
-
-          // In mobile, prefer placing it above or slightly below if too close to top
-          let targetY = rect.top + window.scrollY - tooltipHeight - 10;
-          if (rect.top < 60) {
-            targetY = rect.bottom + window.scrollY + 12;
-          }
-
-          setPosition({ x: targetX, y: targetY });
-          setVisible(true);
-        } catch (e) {
-          setVisible(false);
-        }
-      } else {
+      if (!isEnglishWordOrPhrase) {
         setVisible(false);
+        return;
       }
+
+      setSelectedWord(cleaned);
+      setContextSentence(surrounding);
+
+      // Compute fixed viewport coordinates
+      const isMobile = window.innerWidth < 640;
+      const tooltipWidth = isMobile ? 180 : 200;
+      const tooltipHeight = 42;
+
+      let targetX = rect.left + rect.width / 2 - tooltipWidth / 2;
+      targetX = Math.max(12, Math.min(window.innerWidth - tooltipWidth - 12, targetX));
+
+      // Prefer placing directly above the selected text
+      let targetY = rect.top - tooltipHeight - 8;
+      // If too close to top of viewport, flip to bottom
+      if (rect.top < tooltipHeight + 16) {
+        targetY = rect.bottom + 8;
+      }
+
+      setPosition({ x: targetX, y: targetY });
+      setVisible(true);
     };
 
     const handleMouseUp = (e: MouseEvent) => {
       if (tooltipRef.current && tooltipRef.current.contains(e.target as Node)) {
         return;
       }
-      setTimeout(handleSelection, 20);
+      setTimeout(handleSelection, 30);
     };
 
     const handleTouchEnd = (e: TouchEvent) => {
       if (tooltipRef.current && tooltipRef.current.contains(e.target as Node)) {
         return;
       }
-      setTimeout(handleSelection, 100);
+      setTimeout(handleSelection, 120);
     };
 
-    const handlePointerDown = (e: Event) => {
-      if (tooltipRef.current && !tooltipRef.current.contains(e.target as Node)) {
-        setVisible(false);
+    const handleDismiss = (e: Event) => {
+      if (tooltipRef.current && tooltipRef.current.contains(e.target as Node)) {
+        return;
       }
+      // Small timeout to allow click on tooltip
+      setTimeout(() => {
+        const sel = window.getSelection();
+        if (!sel || sel.isCollapsed) {
+          setVisible(false);
+        }
+      }, 80);
     };
 
     document.addEventListener('mouseup', handleMouseUp);
     document.addEventListener('touchend', handleTouchEnd);
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('touchstart', handlePointerDown);
+    document.addEventListener('selectionchange', handleDismiss);
 
     return () => {
       document.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('touchend', handleTouchEnd);
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('touchstart', handlePointerDown);
+      document.removeEventListener('selectionchange', handleDismiss);
     };
   }, []);
 
-  if (!visible) return null;
+  if (!visible || !selectedWord) return null;
+
+  const isAlreadySaved = savedWords.some(
+    (w) => w.word.toLowerCase() === selectedWord.toLowerCase()
+  );
 
   return (
     <div
       ref={tooltipRef}
+      onMouseDown={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
       style={{
-        position: 'absolute',
+        position: 'fixed',
         left: `${position.x}px`,
         top: `${position.y}px`,
-        zIndex: 9999,
+        zIndex: 99999,
       }}
-      className="animate-in fade-in zoom-in-95 duration-150 flex items-center gap-1.5 p-1 rounded-full liquid-glass-modal shadow-2xl border border-white/90 backdrop-blur-xl select-none"
+      className="animate-in fade-in zoom-in-95 duration-150 flex items-center gap-1.5 p-1 rounded-full liquid-glass-modal shadow-2xl border border-white/95 backdrop-blur-2xl select-none"
     >
       {onDirectAddWord && (
         <button
           type="button"
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation();
             setVisible(false);
-            onDirectAddWord(selectedText, contextSentence);
+            onDirectAddWord(selectedWord, contextSentence);
           }}
-          className="flex items-center gap-1.5 px-3 py-1.5 sm:py-1.5 bg-black text-white hover:bg-zinc-800 rounded-full text-xs font-semibold cursor-pointer active-press shadow-xs"
-          title="无需等待直接加入生词本"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer active-press shadow-xs transition-all ${
+            isAlreadySaved
+              ? 'bg-zinc-800 text-white'
+              : 'bg-black text-white hover:bg-zinc-800'
+          }`}
+          title={isAlreadySaved ? '单词已在你的生词本中' : '一键直接保存至生词本'}
         >
-          <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
-          <span>+ 入生词本</span>
+          {isAlreadySaved ? (
+            <>
+              <Check className="w-3.5 h-3.5 text-emerald-400" />
+              <span>已在生词本</span>
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
+              <span>+ 存生词本</span>
+            </>
+          )}
         </button>
       )}
 
       <button
         type="button"
-        onClick={() => {
+        onClick={(e) => {
+          e.stopPropagation();
           setVisible(false);
-          onLookupWord(selectedText, contextSentence);
+          onLookupWord(selectedWord, contextSentence);
         }}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-zinc-800 hover:text-black hover:bg-white/80 rounded-full text-xs font-semibold cursor-pointer active-press transition-colors"
-        title="查看详细词义与发音"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 text-zinc-800 hover:text-black hover:bg-white/80 rounded-full text-xs font-semibold cursor-pointer active-press transition-colors"
+        title="查看详细词义与语境发音"
       >
         <BookMarked className="w-3.5 h-3.5 text-zinc-600" />
-        <span>详情释义</span>
+        <span>释义</span>
       </button>
     </div>
   );

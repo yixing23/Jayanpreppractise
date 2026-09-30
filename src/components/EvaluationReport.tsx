@@ -248,7 +248,29 @@ export const EvaluationReport: React.FC<EvaluationReportProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {onLookupWord && (
+                    {onDirectAddWord ? (
+                      <button
+                        type="button"
+                        onClick={() => onDirectAddWord(item.corrected, item.corrected, item.ruleExplanation)}
+                        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-semibold transition-all ${
+                          savedWords?.some((w) => w.word.toLowerCase() === item.corrected.toLowerCase())
+                            ? 'bg-black text-white shadow-xs'
+                            : 'liquid-glass-pill text-zinc-900 hover:bg-black hover:text-white'
+                        }`}
+                      >
+                        {savedWords?.some((w) => w.word.toLowerCase() === item.corrected.toLowerCase()) ? (
+                          <>
+                            <Check className="w-3 h-3 text-white" />
+                            <span>已在词本</span>
+                          </>
+                        ) : (
+                          <>
+                            <BookmarkPlus className="w-3 h-3" />
+                            <span>+ 存生词本</span>
+                          </>
+                        )}
+                      </button>
+                    ) : onLookupWord ? (
                       <button
                         type="button"
                         onClick={() => onLookupWord(item.corrected, item.corrected)}
@@ -257,7 +279,7 @@ export const EvaluationReport: React.FC<EvaluationReportProps> = ({
                         <BookmarkPlus className="w-3 h-3" />
                         <span>存入生词本</span>
                       </button>
-                    )}
+                    ) : null}
                     <button
                       onClick={() => handleCopy(item.corrected, `err-${idx}`)}
                       className="p-1 text-zinc-400 hover:text-black rounded"

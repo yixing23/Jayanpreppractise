@@ -667,6 +667,7 @@ export default function App() {
       <SelectionLookupTooltip
         onLookupWord={handleLookupWord}
         onDirectAddWord={handleDirectAddWord}
+        savedWords={vocabWords}
       />
 
       {/* Floating Toast Notification */}
