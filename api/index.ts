@@ -6,9 +6,7 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-// Built-in fallback key so the API never crashes if deployment environment variables are missing
-const FALLBACK_KEY = ['sk-', 'c8d05ec58402', '403d868c50f1', 'a55cca6d'].join('');
-const DEEPSEEK_API_KEY = (process.env.DEEPSEEK_API_KEY || FALLBACK_KEY).trim();
+const DEEPSEEK_API_KEY = (process.env.DEEPSEEK_API_KEY || '').trim();
 
 // Normalize Vercel Serverless Function rewrites so routes match reliably
 app.use((req, _res, next) => {
